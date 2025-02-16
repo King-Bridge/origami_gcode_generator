@@ -1,0 +1,24 @@
+# number of polygons
+2
+
+# polygon 1
+# number of sides and number of hinges
+4   1
+# x and y coordinates of vertices (counter-clockwise)
+0   0
+10  0
+10  10
+0   10
+# side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
+2   1   180
+
+# polygon 2
+# number of sides and number of hinges
+4   1
+# x and y coordinates of vertices (counter-clockwise)
+10  0
+20  0
+20  10
+10  10
+# side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
+4   1   180
