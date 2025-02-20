@@ -6,9 +6,9 @@
 4   1
 # x and y coordinates of vertices (counter-clockwise)
 0   0
-8   0
-8   8
-0   8
+16  0
+16  16
+0   16
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 2   1   90
 
@@ -16,10 +16,10 @@
 # number of sides and number of hinges
 4   3
 # x and y coordinates of vertices (counter-clockwise)
-8   0
 16  0
-16  8
-8   8
+32  0
+32  16
+16  16
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 2   1   90
 3   1   90
@@ -29,10 +29,10 @@
 # number of sides and number of hinges
 4   1
 # x and y coordinates of vertices (counter-clockwise)
-8   8
-16  8
 16  16
-8   16
+32  16
+32  32
+16  32
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 1   1   90
 
@@ -40,10 +40,10 @@
 # number of sides and number of hinges
 4   3
 # x and y coordinates of vertices (counter-clockwise)
-16  0
-24  0
-24  8
-16  8
+32  0
+48  0
+48  16
+32  16
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 1   1   90
 2   1   90
@@ -53,10 +53,10 @@
 # number of sides and number of hinges
 4   1
 # x and y coordinates of vertices (counter-clockwise)
-16  -8
-24  -8
-24  0
-16  0
+32  -16
+48  -16
+48  0
+32  0
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 3   1   90
 
@@ -64,9 +64,9 @@
 # number of sides and number of hinges
 4   1
 # x and y coordinates of vertices (counter-clockwise)
-24  0
-32  0
-32  8
-24  8
+48  0
+64  0
+64  16
+48  16
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 4   1   90
