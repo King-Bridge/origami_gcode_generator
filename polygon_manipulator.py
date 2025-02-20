@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import networkx as nx
 
 layer_height = 0.4
