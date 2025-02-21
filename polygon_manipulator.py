@@ -213,6 +213,50 @@ def transform_polygons(polygon_array, edges):
     return transformed_polygon_array
 
 
+def remove_duplicate_polygons(polygon_array, tolerance=1e-6):
+    """
+    从多边形数组中删除重复的多边形（考虑顶点顺序不同的情况）。
+
+    Args:
+        polygon_array: 原始多边形数组。
+        tolerance: 比较浮点数时使用的容差值。
+
+    Returns:
+        一个包含唯一多边形的新多边形数组。
+    """
+
+    unique_polygons = []
+    seen = set()
+
+    for polygon in polygon_array:
+        # 获取顶点坐标
+        vertices = polygon[0]
+        # 转换为 NumPy 数组，方便后续操作
+        np_vertices = np.array(vertices)
+        # 对顶点坐标进行排序 (按字典序排列)
+        sorted_vertices = np_vertices[np.lexsort(np.transpose(np_vertices))]
+        # 将排序后的顶点坐标转换为元组的元组，使其可哈希
+        hashable_vertices = tuple(tuple(v) for v in sorted_vertices)
+
+        # 判断是否已经见过这个多边形
+        if hashable_vertices not in seen:
+            is_duplicate = False
+            for seen_polygon in unique_polygons:
+                seen_np_vertices = np.array(seen_polygon[0])
+                # 对已见过的多边形的顶点进行排序
+                seen_sorted_vertices = seen_np_vertices[np.lexsort(np.transpose(seen_np_vertices))]
+                # 比较排序后的顶点是否相同
+                if np.allclose(sorted_vertices, seen_sorted_vertices, atol=tolerance):
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                unique_polygons.append(polygon)
+                seen.add(hashable_vertices) #存储hashable_vertices
+
+    return unique_polygons
+
+
 def translate_connected_edges(polygon_array):
     """
     将每个多边形与别的多边形相连的边进行处理，插入新顶点并更新连接信息。
@@ -223,6 +267,8 @@ def translate_connected_edges(polygon_array):
     Returns:
         修改后的多边形数组。
     """
+    
+    polygons_island = []
 
     transformed_polygon_array = []
     for polygon_index, (vertices, connections) in enumerate(polygon_array):
@@ -237,7 +283,11 @@ def translate_connected_edges(polygon_array):
         # for i in range (len(connections)):
         #     conn = connections[-(i+1)]
             edge_index = int(conn[0])
-            width = np.abs(calculate_width(conn[1], conn[2]))  # 使用绝对值
+            theta = conn[2]
+            if theta > 90:
+                theta /= 2
+                
+            width = np.abs(calculate_width(conn[1], theta))  # 使用绝对值
             translation_distance = (width - delta) / 2.0
 
             # 获取边的顶点坐标
@@ -276,8 +326,18 @@ def translate_connected_edges(polygon_array):
             # if count == 0:
             # count += 1
             
+            # add island polygons
+            if conn[2] > 90:
+                vi1 = v1 + normalized_vector * (translation_distance + delta)
+                vi2 = v2 + normalized_vector * (translation_distance + delta)
+                vi3 = v2 + normalized_vector * (np.abs(calculate_width(conn[1], conn[2])) - translation_distance - delta)
+                vi4 = v1 + normalized_vector * (np.abs(calculate_width(conn[1], conn[2])) - translation_distance - delta)
+                
+                polygons_island.append([[vi2.tolist(), vi1.tolist(), vi4.tolist(), vi3.tolist()], [[1, conn[1], conn[2]], [3, conn[1], conn[2]]]])
+                
+                # print('add island polygons: ', polygons_island[-1])
+                
         # print(insert_info)
-
 
         # 插入新顶点
         offset = 1
@@ -295,8 +355,18 @@ def translate_connected_edges(polygon_array):
             offset += 2
 
         transformed_polygon_array.append([new_vertices, new_connections])
+        
+    # print(polygons_island)
 
+    transformed_polygon_array += remove_duplicate_polygons(polygons_island)
+    
+    for i in range (len(transformed_polygon_array)):
+        for j in range (len(transformed_polygon_array[i][1])):
+            if transformed_polygon_array[i][1][j][2] > 90:
+                transformed_polygon_array[i][1][j][2] /= 2
+                
     return transformed_polygon_array
+
 
 
 def add_hinges(polygons):
@@ -307,6 +377,256 @@ def add_hinges(polygons):
         polygons_modified = transform_polygons(polygons, edges)
         polygons_final =  translate_connected_edges(polygons_modified)
         return polygons_final
+
+    else:
+        print('The origami pattern contains cycles, please manually make gcode file.')
+        
+    
+def translate_to_continent(polygon_array):
+    """
+    将每个多边形与别的多边形相连的边进行处理，插入新顶点并更新连接信息。
+
+    Args:
+        polygon_array: 原始多边形数组。
+
+    Returns:
+        修改后的多边形数组。
+    """
+
+    transformed_polygon_array = []
+    for polygon_index, (vertices, connections) in enumerate(polygon_array):
+        new_vertices = vertices[:]  # 复制顶点列表，避免修改原始数据
+        new_connections = []  # 创建新的连接信息列表
+
+        insert_info = []  # 存储要插入的顶点信息 (索引，顶点坐标)
+        vertex_count = len(vertices)
+
+        # count = 0
+        for conn in connections:
+        # for i in range (len(connections)):
+        #     conn = connections[-(i+1)]
+            edge_index = int(conn[0])
+                
+            width = np.abs(calculate_width(conn[1], conn[2]))  # 使用绝对值
+            translation_distance = width / 2.0
+
+            # 获取边的顶点坐标
+            v1_index = (edge_index - 1) % vertex_count
+            v2_index = edge_index % vertex_count
+            v1 = vertices[v1_index]
+            v2 = vertices[v2_index]
+
+            # 计算新的顶点位置
+            edge_direction = np.array(v2) - np.array(v1)
+            normal_vector = np.array([edge_direction[1], - edge_direction[0]])
+
+            # # 确保法向量指向多边形外部
+            # center = np.mean(np.array(vertices), axis=0)
+            # midpoint = (np.array(v1) + np.array(v2)) / 2.0
+            # to_center = center - midpoint
+
+            # if np.dot(normal_vector, to_center) > 0:
+            #     normal_vector = -normal_vector
+
+            # 归一化向量
+            norm = np.linalg.norm(normal_vector)
+            if norm == 0:
+                print('Warning: Normal vector is zero. Maybe two vertices are duplicate.')
+                continue  # 避免除以零
+            normalized_vector = normal_vector / norm
+            translation_vector = normalized_vector * translation_distance
+
+            # 计算新的顶点位置
+            new_v1 = np.array(v1) + translation_vector
+            new_v2 = np.array(v2) + translation_vector
+
+            # 存储插入信息（在 v2 之前插入 new_v1，然后在 v2 之前插入 new_v2）
+            insert_info.append((v1_index, new_v1.tolist()))
+            insert_info.append((v1_index, new_v2.tolist()))
+            # if count == 0:
+            # count += 1
+   
+        # print(insert_info)
+
+        # 插入新顶点
+        offset = 1
+        # for i, insert_vertex in sorted(insert_info):  # 确保索引从小到大排列
+        for i, insert_vertex in insert_info:
+            new_vertices.insert(i + offset, insert_vertex)
+            offset += 1
+
+        # 更新连接信息
+        offset = 1
+        for conn in connections:
+            edge_index = int(conn[0])
+            #由于顶点插入到边的第二个顶点，因此坐标不会发生改变
+            new_connections.append([edge_index + offset, conn[1], conn[2]]) #添加未修改的连接信息
+            offset += 2
+
+        transformed_polygon_array.append([new_vertices, new_connections])
+        
+    return transformed_polygon_array
+
+
+def extract_outer_polygon_vertices(polygon_array):
+    """
+    从多边形数组中提取大多边形的顶点信息，并按轮廓顺序排列 (不依赖于极坐标)。
+
+    Args:
+        polygon_array: 原始多边形数组，满足上述条件。
+
+    Returns:
+        一个包含大多边形顶点坐标的列表，按轮廓顺序排列。
+    """
+
+    # 1. 找到一个起始顶点 (不在任何公共边上的顶点)
+    start_polygon_index = 0
+    start_vertex_index = 0
+    start_vertex = None
+
+    # 首先找到一个起始多边形
+    for i, polygon in enumerate(polygon_array):
+        is_shared_polygon = False
+        for other_polygon in polygon_array:
+            if other_polygon is polygon:
+                continue
+            #如果和其他多边形相连，则跳过该多边形，寻找下一个多边形
+            for conn1 in polygon[1]:
+                edge_index1 = int(conn1[0])
+                polygon1_vertices = polygon[0]
+                v1_index1 = (edge_index1 - 1) % len(polygon1_vertices)
+                v2_index1 = edge_index1 % len(polygon1_vertices)
+                candidate_v1 = polygon1_vertices[v1_index1]
+                candidate_v2 = polygon1_vertices[v2_index1]
+                for conn2 in other_polygon[1]:
+                    edge_index2 = int(conn2[0])
+                    other_vertices = other_polygon[0]
+                    neighbor_v1_index2 = (edge_index2 - 1) % len(other_vertices)
+                    neighbor_v2_index2 = edge_index2 % len(other_vertices)
+                    neighbor_v1 = other_vertices[neighbor_v1_index2]
+                    neighbor_v2 = other_vertices[neighbor_v2_index2]
+                    if (is_same_vertex(candidate_v1, neighbor_v1) and is_same_vertex(candidate_v2, neighbor_v2)) or \
+                        (is_same_vertex(candidate_v1, neighbor_v2) and is_same_vertex(candidate_v2, neighbor_v1)):
+                        is_shared_polygon = True # 如果找到共享边，跳过该多边形
+                        break
+                if is_shared_polygon:
+                    break
+            if not is_shared_polygon:
+                start_polygon_index = i
+                break
+        if not is_shared_polygon:
+            break
+
+    vertices = polygon_array[start_polygon_index][0]
+    #然后在这个多边形中寻找起始顶点
+    for j, vertex in enumerate(vertices):
+        is_shared = False
+        for conn in polygon_array[start_polygon_index][1]:
+            edge_index = int(conn[0])
+            v1_index = (edge_index - 1) % len(vertices)
+            v2_index = edge_index % len(vertices)
+            v1 = vertices[v1_index]
+            v2 = vertices[v2_index]
+            if (is_same_vertex(vertex, v1)) or (is_same_vertex(vertex,v2)):
+                is_shared = True
+                break # 如果找到公共顶点，则跳过该顶点
+        if not is_shared:
+            start_vertex_index = j
+            start_vertex = vertex
+            break
+
+    if start_vertex is None:
+        print("警告：无法找到起始顶点！")
+        return []  # 或者引发异常
+
+    # 2. 从起始顶点开始，追踪轮廓
+    outer_polygon_vertices = []
+    current_polygon_index = start_polygon_index
+    current_vertex_index = start_vertex_index
+
+    first_polygon_index = start_polygon_index
+    first_vertex_index = start_vertex_index
+    first_vertex = polygon_array[start_polygon_index][0][start_vertex_index]
+
+    while True:
+        current_polygon = polygon_array[current_polygon_index]
+        vertices = current_polygon[0]
+        vertex = vertices[current_vertex_index]
+
+        # print('current vertex: ', vertex)  # 调试信息
+        if not outer_polygon_vertices or not is_same_vertex(vertex, outer_polygon_vertices[-1]): #确保只在必要时添加顶点
+            outer_polygon_vertices.append(vertex)
+        # print('current outer: ', outer_polygon_vertices)
+
+        # 寻找下一个顶点，从当前节点的下一个节点开始寻找
+        next_vertex_index = (current_vertex_index + 1) % len(vertices)
+        next_vertex = vertices[next_vertex_index]
+
+        # 检查当前边是否与其他多边形共享
+        shared_polygon_index = None
+        shared_edge_index = None
+
+        for other_polygon_index, other_polygon in enumerate(polygon_array):
+            if other_polygon_index == current_polygon_index:
+                continue
+
+            other_vertices = other_polygon[0]
+            #遍历所有的与别的多边形连接的边
+            for conn in other_polygon[1]:
+                edge_index = int(conn[0])
+                v1_index = (edge_index - 1) % len(other_vertices)
+                v2_index = edge_index % len(other_vertices)
+                v1 = other_vertices[v1_index]
+                v2 = other_vertices[v2_index]
+                #查看当前考查的两个顶点是不是和这条边的两个端点相同
+                if (is_same_vertex(vertex, v2) and is_same_vertex(next_vertex, v1)):
+                    shared_polygon_index = other_polygon_index
+                    shared_edge_index = edge_index
+                    # print('break flag 0')
+                    break
+                elif (is_same_vertex(vertex, v1) and is_same_vertex(next_vertex,v2)):
+                    shared_polygon_index = other_polygon_index
+                    shared_edge_index = edge_index
+                    # print('break flag 0')
+                    break
+            if shared_polygon_index is not None:
+                # print('break flag 01')
+                break
+
+        # 如果没有找到共享边，则沿着当前多边形的下一条边继续
+        if shared_polygon_index is None:
+            current_vertex_index = next_vertex_index
+        else:
+            # 否则，切换到共享多边形，并沿着共享边的反方向继续
+            current_polygon_index = shared_polygon_index
+            other_vertices = polygon_array[current_polygon_index][0]
+            #切换到新的多边形之后，需要找到新的多边形中，和共享边对应的不是vertex的那个顶点
+            current_vertex_index = None
+            for v_index, v in enumerate(other_vertices):
+                if (is_same_vertex(vertex, v)):
+                    current_vertex_index = v_index
+                    # print('break flag 1', v)
+                    break
+
+            if current_vertex_index is None:
+               raise ValueError("未能正确找到共享顶点")
+
+        # 检查是否回到起始点 (需要同时检查多边形和顶点)
+        if current_polygon_index == first_polygon_index and is_same_vertex(polygon_array[current_polygon_index][0][current_vertex_index], first_vertex):
+            # print('break flag 2')
+            break
+
+    return outer_polygon_vertices
+
+
+def find_outer_countour(polygons):
+    graph = polygon_array_to_graph(polygons)
+    
+    if not has_cycles(graph):
+        edges = dfs_tree_traversal(graph, 0, polygons)
+        polygons_modified = transform_polygons(polygons, edges)
+        outer_polygon_vertices = extract_outer_polygon_vertices(translate_to_continent(polygons_modified))
+        return outer_polygon_vertices
 
     else:
         print('The origami pattern contains cycles, please manually make gcode file.')

@@ -46,7 +46,31 @@ def read_data_file(filename):
     return polygons
 
 
-def draw_polygons(polygons):
+def get_array_depth(arr):
+    """
+    计算不规则数组的深度。
+
+    Args:
+        arr: 要计算深度的数组。
+
+    Returns:
+        数组的深度。
+    """
+
+    if not isinstance(arr, list):
+        return 0  # 如果不是列表，则深度为 0
+
+    if not arr:
+        return 1  # 空列表的深度为 1
+
+    max_depth = 1
+    for item in arr:
+        max_depth = max(max_depth, get_array_depth(item) + 1)  # 递归计算每个元素的深度
+
+    return max_depth
+
+
+def draw_polygons(polygons, plot_title="Origami Pattern"):
     """
     Draw the origami pattern represented by the given polygons data.
 
@@ -71,7 +95,7 @@ def draw_polygons(polygons):
     ax.set_ylim(min_y - 1, max_y + 1)
 
     marked_edges = set()  
-
+    
     for polygon in polygons:
         vertices = polygon[0]
         highlight_edges = polygon[1]
@@ -109,7 +133,7 @@ def draw_polygons(polygons):
             
             ax.plot([x1, x2], [y1, y2], color=color, linewidth=2)
 
-    plt.title("Origami Pattern")
+    plt.title(plot_title)
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.grid(True)
