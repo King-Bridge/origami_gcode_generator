@@ -630,3 +630,4 @@ def find_outer_countour(polygons):
 
     else:
         print('The origami pattern contains cycles, please manually make gcode file.')
+        
