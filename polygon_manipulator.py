@@ -468,6 +468,92 @@ def translate_to_continent(polygon_array):
     return transformed_polygon_array
 
 
+def translate_to_continent_for_surface(polygon_array):
+    """
+    将每个多边形与别的多边形相连的边进行处理，插入新顶点并更新连接信息。
+
+    Args:
+        polygon_array: 原始多边形数组。
+
+    Returns:
+        修改后的多边形数组。
+    """
+
+    transformed_polygon_array = []
+    for polygon_index, (vertices, connections) in enumerate(polygon_array):
+        new_vertices = vertices[:]  # 复制顶点列表，避免修改原始数据
+        new_connections = []  # 创建新的连接信息列表
+
+        insert_info = []  # 存储要插入的顶点信息 (索引，顶点坐标)
+        vertex_count = len(vertices)
+
+        # count = 0
+        for conn in connections:
+        # for i in range (len(connections)):
+        #     conn = connections[-(i+1)]
+            edge_index = int(conn[0])
+                
+            width = np.abs(calculate_width(conn[1], conn[2]))  # 使用绝对值
+            translation_distance = delta / 2
+
+            # 获取边的顶点坐标
+            v1_index = (edge_index - 1) % vertex_count
+            v2_index = edge_index % vertex_count
+            v1 = vertices[v1_index]
+            v2 = vertices[v2_index]
+
+            # 计算新的顶点位置
+            edge_direction = np.array(v2) - np.array(v1)
+            normal_vector = np.array([edge_direction[1], - edge_direction[0]])
+
+            # # 确保法向量指向多边形外部
+            # center = np.mean(np.array(vertices), axis=0)
+            # midpoint = (np.array(v1) + np.array(v2)) / 2.0
+            # to_center = center - midpoint
+
+            # if np.dot(normal_vector, to_center) > 0:
+            #     normal_vector = -normal_vector
+
+            # 归一化向量
+            norm = np.linalg.norm(normal_vector)
+            if norm == 0:
+                print('Warning: Normal vector is zero. Maybe two vertices are duplicate.')
+                continue  # 避免除以零
+            normalized_vector = normal_vector / norm
+            translation_vector = normalized_vector * translation_distance
+
+            # 计算新的顶点位置
+            new_v1 = np.array(v1) + translation_vector
+            new_v2 = np.array(v2) + translation_vector
+
+            # 存储插入信息（在 v2 之前插入 new_v1，然后在 v2 之前插入 new_v2）
+            insert_info.append((v1_index, new_v1.tolist()))
+            insert_info.append((v1_index, new_v2.tolist()))
+            # if count == 0:
+            # count += 1
+   
+        # print(insert_info)
+
+        # 插入新顶点
+        offset = 1
+        # for i, insert_vertex in sorted(insert_info):  # 确保索引从小到大排列
+        for i, insert_vertex in insert_info:
+            new_vertices.insert(i + offset, insert_vertex)
+            offset += 1
+
+        # 更新连接信息
+        offset = 1
+        for conn in connections:
+            edge_index = int(conn[0])
+            #由于顶点插入到边的第二个顶点，因此坐标不会发生改变
+            new_connections.append([edge_index + offset, conn[1], conn[2]]) #添加未修改的连接信息
+            offset += 2
+
+        transformed_polygon_array.append([new_vertices, new_connections])
+        
+    return transformed_polygon_array
+
+
 def extract_outer_polygon_vertices(polygon_array):
     """
     从多边形数组中提取大多边形的顶点信息，并按轮廓顺序排列 (不依赖于极坐标)。
@@ -631,3 +717,99 @@ def find_outer_countour(polygons):
     else:
         print('The origami pattern contains cycles, please manually make gcode file.')
         
+
+def merge_sublists_with_common_elements(data):
+    """
+    合并具有相同元素的子列表。
+
+    参数：
+        data: 包含子列表的列表。
+
+    返回值：
+        合并后的列表。
+    """
+
+    def find_connected_sublist_index(current_index, merged_groups):
+        """
+        查找与当前子列表有共同元素的已合并组的索引。
+        """
+        current_set = set(data[current_index])
+        for i, group in enumerate(merged_groups):
+            if current_set.intersection(group):  # 检查交集
+                return i
+        return -1  # 没有找到
+
+    merged_groups = []  # 存储已合并的组
+
+    for i in range(len(data)):
+        connected_group_index = find_connected_sublist_index(i, merged_groups)
+
+        if connected_group_index != -1:
+            # 如果找到有共同元素的组，将当前子列表的元素添加到该组
+            merged_groups[connected_group_index].update(data[i])
+        else:
+            # 如果没有找到，创建一个新的组
+            merged_groups.append(set(data[i]))
+
+    # 将集合转换为列表
+    result = [list(group) for group in merged_groups]
+    return result
+
+
+def add_missing_numbers(data, n):
+    """
+    将 0 到 n-1 中未出现在 data 子列表中的数字作为单独的子列表添加到 data 中。
+
+    参数：
+        data: 包含子列表的列表。
+        n:    范围上限（不包含）。
+
+    返回值：
+        添加了缺失数字后的列表。
+    """
+
+    all_elements = set()
+    for sublist in data:
+        all_elements.update(sublist)  # 将所有子列表的元素添加到集合中
+
+    missing_numbers = []
+    for k in range(n):
+        if k not in all_elements:
+            missing_numbers.append([k])  # 将缺失的数字作为单独的子列表
+
+    return data + missing_numbers  # 将缺失数字的子列表添加到原列表
+
+
+def generate_surface_polygons(polygons_final, direction):
+    graph_surface = polygon_array_to_graph(translate_to_continent_for_surface(polygons_final))
+    
+    if not has_cycles(graph_surface):
+        edges_surface = dfs_tree_traversal(graph_surface, 0, polygons_final)
+
+    else:
+        print('The origami pattern contains cycles, please manually make gcode file.')
+        
+    merge_list = []
+    
+    if direction == 'bottom':
+        for edge in edges_surface:
+            if edge[1] > 0:
+                merge_list.append(edge[0])
+    elif direction == 'top':
+        for edge in edges_surface:
+            if edge[1] < 0:
+                merge_list.append(edge[0])
+    merge_list = merge_sublists_with_common_elements(merge_list)
+    merge_list = add_missing_numbers(merge_list, len(polygons_final))
+    polygons_merged = []
+    for polygon_list in merge_list:
+        if len(polygon_list) == 1:
+            polygons_merged.append(polygons_final[polygon_list[0]][0])
+            continue
+        polygon_to_merge = []
+        for index in polygon_list:
+            polygon_to_merge.append(polygons_final[index])
+        polygon_to_merge = translate_to_continent_for_surface(polygon_to_merge)
+        polygons_merged.append(extract_outer_polygon_vertices(polygon_to_merge))
+    
+    return polygons_merged

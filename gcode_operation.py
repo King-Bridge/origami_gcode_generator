@@ -2,6 +2,7 @@ import numpy as np
 
 from geometry import build_prism
 from cpo import generate_layer
+from polygon_manipulator import generate_surface_polygons
 
 
 def write_header_lines(file, layer_height, line_width, layer_count, mesh, start_x, start_y, start_z=0.3):
@@ -92,8 +93,11 @@ def go_to_next_layer(z, layer_height):
     
 def generate_gcode(file, filename, polygons_final, outer_countour, direction, layer_height, line_width):
     write_header_lines(file, layer_height, line_width, 1, f'{filename}_{direction}', 0, 0)
-    for polygon in polygons_final:
-        write_layer(file, generate_layer(polygon[0]), 0.3, 1)
+    # for polygon in polygons_final:
+    #     write_layer(file, generate_layer(polygon[0]), 0.3, 1)
+    polygon_base = generate_surface_polygons(polygons_final, direction)
+    for polygon in polygon_base:
+        write_layer(file, generate_layer(polygon), 0.3, 1)
 
     write_layer(file, generate_layer(outer_countour), 0.7, 1)
 
