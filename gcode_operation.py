@@ -1,11 +1,12 @@
-import numpy as np
-
 from geometry import build_prism
 from cpo import generate_layer
 from polygon_manipulator import generate_surface_polygons
 
 
 def write_header_lines(file, layer_height, line_width, layer_count, mesh, start_x, start_y, start_z=0.3):
+    """
+    Write the header lines of the gcode file
+    """
     with open(file, 'w') as f:
         header_lines = [
             f";layer_height = {layer_height}",
@@ -33,6 +34,9 @@ def write_header_lines(file, layer_height, line_width, layer_count, mesh, start_
         
 
 def write_finish_lines(file):
+    """
+    Write the finish lines of the gcode file
+    """
     with open(file, 'a') as f:
         finish_lines = [
             "\n\n;Finish",
@@ -44,11 +48,19 @@ def write_finish_lines(file):
         
 
 def initialize_layer(xy, z, lines):
+    """
+    Generate the initial lines of a layer
+    """
+    # lines.append("\nG1 Z10.000")
+    # lines.append(f"\nG1 X{xy[0]:.3f} Y{xy[1]:.3f}")
     lines.append(f"\nG1 X{xy[0]:.3f} Y{xy[1]:.3f} Z{z:.3f}")
     return lines
 
 
 def write_move_to(file, x, y, z):
+    """
+    Write the move to command to the gcode file
+    """
     lines = [
         f"\nM9",
         f"\nG1 Z10.000",
@@ -62,7 +74,8 @@ def write_move_to(file, x, y, z):
         
 
 def write_layer(file, point_list, z, direction):
-    """Draw single platform layer by concentrate infill
+    """
+    Draw single platform layer by concentrate infill
 
     Args:
         point_list (ndarray)  : np.array([[x1, y1], [x2, y2], ...])
@@ -88,23 +101,31 @@ def write_layer(file, point_list, z, direction):
         
         
 def go_to_next_layer(z, layer_height):
+    """
+    Move to the next layer
+    """
     z += layer_height
     
     
 def generate_gcode(file, filename, polygons_final, outer_countour, direction, layer_height, line_width):
+    """
+    Generate the gcode file
+    """
     write_header_lines(file, layer_height, line_width, 1, f'{filename}_{direction}', 0, 0)
-    # for polygon in polygons_final:
-    #     write_layer(file, generate_layer(polygon[0]), 0.3, 1)
     polygon_base = generate_surface_polygons(polygons_final, direction)
     for polygon in polygon_base:
+        write_move_to(file, polygon[0][0], polygon[0][1], 0.3)
         write_layer(file, generate_layer(polygon), 0.3, 1)
 
+    write_move_to(file, outer_countour[0][0], outer_countour[0][1], 0.7)
     write_layer(file, generate_layer(outer_countour), 0.7, 1)
 
     for polygon in polygons_final:
         prism = build_prism(polygon, direction)
 
         for layer_index, p in enumerate(prism):
+            if layer_index == 0:
+                write_move_to(file, p[0][0], p[0][1], 1.1)
             write_layer(file, generate_layer(p), 1.1+layer_index*0.4, layer_index%2)
             
     write_finish_lines(file)

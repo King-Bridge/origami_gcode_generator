@@ -1,6 +1,15 @@
 import numpy as np
 
 def calculate_arc(theta, Delta=0.8, mid_layer_count = 10, layer_height = 0.4):
+    """
+    Calculate the arc length of a polygon edge for each layer
+
+    Args:
+        theta (float): bending angle of the edge
+
+    Returns:
+        dl (list, float): list of move-inside-distance for each layer
+    """
     theta = np.deg2rad(theta)
     a = mid_layer_count * layer_height
     h = 2 * layer_height
@@ -17,6 +26,7 @@ def calculate_arc(theta, Delta=0.8, mid_layer_count = 10, layer_height = 0.4):
 
 
 def build_prism_bottom(polygon, mid_layer_count):
+    
     prism = []
     
     layer_count = mid_layer_count
@@ -55,6 +65,7 @@ def build_prism_bottom(polygon, mid_layer_count):
 
 
 def build_prism_top(polygon, mid_layer_count):
+    
     prism = []
     
     layer_count = mid_layer_count
@@ -93,6 +104,9 @@ def build_prism_top(polygon, mid_layer_count):
 
 
 def build_prism(polygon, position, mid_layer_count=10):
+    """
+    Generate the prism of a polygon acording to the edge information
+    """
     if position == 'bottom':
         prism = build_prism_bottom(polygon, mid_layer_count)
     elif position == 'top':
