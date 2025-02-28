@@ -89,7 +89,7 @@
 # x and y coordinates of vertices (counter-clockwise)
 40  6
 40  -6
-46  -2
-46  2
+50  -2
+50  2
 # side number, folding orientation and bending angle of hinges (0 for mountain, 1 for valley)
 1   0   70
