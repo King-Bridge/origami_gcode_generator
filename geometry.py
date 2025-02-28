@@ -21,6 +21,9 @@ def calculate_arc(theta, Delta=0.8, mid_layer_count = 10, layer_height = 0.4):
     for i in range (mid_layer_count):
         x = np.sqrt(a ** 2 - (a - layer_height * (1/2 + i)) ** 2)
         dl.append(x*b/a)
+
+    # for i in range (len(dl)):
+    #     dl[i] -= Delta/2
         
     return dl
 
