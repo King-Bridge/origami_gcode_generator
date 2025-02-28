@@ -61,14 +61,18 @@ def rotate_polygon(polygon):
 def generate_layer(polygon):
     polygon = simplify_polygon_vertices(polygon, tolerance=1e-6)
     polygon = rotate_polygon(polygon)
+    # print(len(polygon))
     ring_outer = LinearRing(polygon+[polygon[0]])
+    # print(ring_outer)
 
     ring_outer_list = [ring_outer.parallel_offset(0.2, side='left', join_style='mitre')]
 
     while(1):
         ring_outer_offset = ring_outer_list[-1].parallel_offset(0.4, side='left', join_style='mitre')
-
-        if Polygon(ring_outer_offset).area < 0.1:
+        try:
+            if Polygon(ring_outer_offset).area < 0.1:
+                break
+        except:
             break
         ring_outer_list.append(ring_outer_offset)
 
